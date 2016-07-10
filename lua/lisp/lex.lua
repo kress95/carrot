@@ -87,7 +87,6 @@ function lex(input)
   local forms   = {}       -- form tracker
   local line    = 1        -- current line
   local column  = 0        -- current column
-  local heredoc = false    -- heredoc mode
   local escape  = false    -- escape mode
 
   -- accumulator information
@@ -154,7 +153,6 @@ function lex(input)
       table.insert(output.tokens, {
         type     = type,
         value    = accum.value,
-        disabled = heredoc,
         position = pos(accum.line, accum.column, line, column)
       })
 
@@ -162,8 +160,10 @@ function lex(input)
     end
   end
 
+  local input_length = #input
+
   -- main loop
-  for idx = 1, #input do
+  for idx = 1, input_length do
 
     -- current character and current mode
     local char = input:byte(idx)
@@ -207,9 +207,13 @@ function lex(input)
     end
 
     if p_mode == 'normal' then
-      if mode == 'normal' then
+      if mode == 'normal' and idx < input_length then
         acc(idx)
       else
+        if mode == 'normal' and idx == input_length then
+          acc(idx)
+        end
+
         if is_acc() then
           local acc_type = 'literal'
 
@@ -227,7 +231,6 @@ function lex(input)
           table.insert(output.tokens, {
             type     = c_form,
             value    = 'begin',
-            disabled = heredoc,
             position = pos(line, column)
           })
         elseif closing then
@@ -236,15 +239,30 @@ function lex(input)
             table.insert(output.tokens, {
               type     = c_form,
               value    = 'end',
-              disabled = heredoc,
               position = pos(line, column)
             })
+
+            mode = forms[table.maxn(forms)]
+
+            if mode == 'heredoc' then
+              table.insert(output.tokens, {
+                type     = mode,
+                value    = 'end',
+                position = pos(line, column)
+              })
+
+              table.remove(forms)
+            end
           else
             err(p_form, c_form)
           end
-          heredoc = false
         elseif mode == 'heredoc' then
-          heredoc = true
+          table.insert(forms, mode)
+          table.insert(output.tokens, {
+            type     = mode,
+            value    = 'begin',
+            position = pos(line, column)
+          })
         elseif mode ~= 'ignore' then
           p_mode = mode
         end

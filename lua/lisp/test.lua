@@ -36,7 +36,7 @@ table.print = function(t)
 end
 
 table.print(
-  parse(lex("(let a 10 (print a))"))
+  lex("let ten 10")
 )
 
 print(cmode)
