@@ -52,6 +52,13 @@ local macros = {
   'var'  -- define global value
 }
 
+-- detector
+local detector = {}
+
+for k,v in pairs(monadic) do detector[k] = v end
+for k,v in pairs(dyadic)  do detector[k] = v end
+for k,v in pairs(macros)  do detector[k] = v end
+
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 function parse(lexres)
