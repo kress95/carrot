@@ -1,5 +1,4 @@
-./*.dll
-./*.exe
-./luajit
-./lua
-./lua/*
+/lua/jit
+/*.dll
+/*.exe
+/luajit

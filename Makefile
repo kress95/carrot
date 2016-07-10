@@ -1,3 +1,7 @@
+#==============================================================================
+# OS DETECTION
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 PLATFORM = unknown
 
 ifeq ($(OS),Windows_NT)
@@ -26,8 +30,47 @@ else
     endif
 endif
 
-LUA_DIR = ./vendor/luajit/$(PLATFORM)/*
+#==============================================================================
 
+#==============================================================================
+# VARIABLES
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+LUA = ./luajit
+LUA_DIR = ./vendor/luajit/$(PLATFORM)/*
+SDL_DIR = ./vendor/sdl2/$(PLATFORM)/*
+
+#==============================================================================
+
+#==============================================================================
+# INTERNALS
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# copies luajit and sdl to root, the rule name is used
+./lua/jit:
+	cp -r $(LUA_DIR) ./
+	cp -r $(SDL_DIR) ./
+
+# creates the folder used to build the distribution
+./dist:
+	mkdir -p ./dist
+
+# just a good name for calling the function that copies needed files
+initialize: ./lua/jit
+
+# declare rules that are not files
+.PHONY: initialize help debug tests test run dist dirs clean
+
+#==============================================================================
+
+#==============================================================================
+# USER INTERFACE
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# builds everything without debug information
+default:
+
+# shows help information
 help:
 	@echo ""
 	@echo "Usable Rules:"
@@ -47,25 +90,26 @@ help:
 	@echo ""
 	@echo "Till next time :)"
 
-./lua:
-	cp -r $(LUA_DIR) ./
+# builds everything with debug information
+debug:
 
-dirs:
-	mkdir -p ./dist
-	mkdir -p ./proj
+# run tests, returns test result
+tests: initialize
+	$(LUA) "./lua/lisp/test.lua"
 
-tests:
-	$(LUA) "./vendor/lua-lisp/test.lua"
-
+# run specified on FILE variable
 test:
 
+# builds with debug information and run the game
 run:
 
-dist:
+# distribution rule
+dist: ./dist
 
+# deletes built files
 clean:
-	rm -rf ./dist
+	rm -rf ./dist ./lua/jit
+	rm ./*.dll ./*.exe
+	rm -f ./luajit
 
-default:
-
-.PHONY: help debug tests test run dist dirs clean lisp
+#==============================================================================
