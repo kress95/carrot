@@ -1,3 +1,4 @@
+require 'lisp.parse'
 require 'lisp.lex'
 
 table.print = function(t)
@@ -35,7 +36,7 @@ table.print = function(t)
 end
 
 table.print(
-  lex("'a")
+  parse(lex("(let a 10 (print a))"))
 )
 
 print(cmode)

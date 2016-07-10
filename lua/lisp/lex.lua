@@ -193,12 +193,9 @@ function lex(input)
       end
     end
 
-    -- forms lengths
-    local forms_len = table.maxn(forms)
-
     -- detect needed form type
     if closing then
-      p_form = forms[forms_len]
+      p_form = forms[table.maxn(forms)]
     end
 
     -- source location information
@@ -213,7 +210,17 @@ function lex(input)
       if mode == 'normal' then
         acc(idx)
       else
-        acc_reset('literal')
+        if is_acc() then
+          local acc_type = 'literal'
+
+          if accum.value == 'false' or accum.value == 'true' then
+            acc_type = 'boolean'
+          elseif tonumber(accum.value) ~= nil then
+            acc_type = 'number'
+          end
+
+          acc_reset(acc_type)
+        end
 
         if opening then
           table.insert(forms, c_form)
@@ -262,12 +269,14 @@ function lex(input)
     end
   end
 
-  if p_mode == 'astr' then
+  local forms_len = table.maxn(forms)
+
+  if forms_len > 0 then
+    err(forms[forms_len])
+  elseif p_mode == 'astr' then
     err('single-quote')
   elseif p_mode == 'bstr' then
     err('double-quotes')
-  elseif forms_len > 0 then
-    err(forms[forms_len])
   end
 
   return output
