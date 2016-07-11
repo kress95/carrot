@@ -54,9 +54,16 @@ lisp.macros_arity = {
 }
 
 -- lisp.parse, the parser
-function lisp.parse(lexres)
+function lisp.parse(lexres, debug)
+  if debug == nil then
+    debug = true
+  end
+
   if lexres.result.error then
-    return lexres
+    return {
+      ast    = {},
+      result = lexres.result
+    }
   end
 
   local output = {
@@ -153,7 +160,8 @@ function lisp.parse(lexres)
               last_scope.arity = arity
             end
 
-            last_scope.name = token.value
+            last_scope.name     = token.value
+            last_scope.position = token.position
           end
         else
           if last_scope.arity == nil or

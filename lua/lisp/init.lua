@@ -1,16 +1,14 @@
---[[
+if lisp == nil then
+  lisp = {}
+end
 
-Lex rules:
+require 'lisp.lex'
+require 'lisp.parse'
+require 'lisp.build'
 
-  ;   - comment, closed by a newline
-  \   - string escape
-  #   - comment form
-(   ) - usual form
-{   } - form for map-like tables
-[   ] - form for list-like tables
-'   ' - form for strings
-"   " - also a form for strings
-
-Anything not found in the list is tagged as a literal. (I'm a lazy bum)
-
---]]
+function lisp.compile(str, debug)
+  if debug == nil then
+    debug = false
+  end
+  return lisp.build(lisp.parse(lisp.lex(str), debug), debug)
+end

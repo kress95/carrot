@@ -2,6 +2,8 @@ if lisp == nil then
   lisp = {}
 end
 
+require 'lisp.parse'
+
 -- local functions object
 local _ = {}
 
@@ -46,31 +48,37 @@ end
 
 -- monadic maths
 function _.monadic_math(op, a)
-  return _.parens(_.mut_merge({ _.raw(op) }, _.parens(a)))
+  return _.parens(_.mut_merge({ op }, { a }))
 end
 
 -- dyadic maths
-function _.dyadic_math(a, root, b)
-  return _.parens(
-    _.mut_merge(
-      _.parens(a),
-      { _.operator(root) },
-      _.parens(b)
-    )
-  )
+function _.dyadic_math(a, op, b)
+  return _.mut_merge(_.parens(a), { op }, _.parens(b))
 end
 
 -- operator
 function _.operator(tk)
-
-  table.print(tk)
-  return { ' e'}
+  local name  = tk.name
+  local arity = lisp.macros_arity[name]
+  if arity == 2 then
+    local op = _.raw(' ' .. name .. ' ', tk.position)
+    return _.dyadic_math(tk.value[1], op, tk.value[2])
+  elseif arity == 1 then
+    local op = _.raw(name .. ' ', tk.position)
+    return _.monadic_math(op, tk.value[1])
+  end
 end
 
 
 -- default macros
 local macros = {
-  ['+'] = function (root, a, b)
+  ['+']  = 'op',
+  ['-']  = 'op',
+  ['/']  = 'op',
+  ['*']  = 'op',
+  ['^']  = 'op'
+
+  --[[['+'] = function (root, a, b)
     return _.dyadic_math(a, root, b)
     --[[
     local output = {}
@@ -90,14 +98,21 @@ local macros = {
       merge_parens(output, b)
     end
 
-    return output]]
-  end
+    return output
+  end]]
 }
 
 -- lisp.build, the builder
-function lisp.build(parseres)
+function lisp.build(parseres, debug)
+  if debug == nil then
+    debug = true
+  end
+
   if parseres.result.error then
-    return parseres
+    return {
+      source = '',
+      result = parseres.result
+    }
   end
 
   local stack  = {}
@@ -131,24 +146,52 @@ function lisp.build(parseres)
       map(curr.value, function(item) merge(ast, analyze(item)) end)
       return ast
     elseif curr.type == 'macro' then
-      local args = map(curr.value, function(item)
+      curr.value = map(curr.value, function(item)
         return analyze(item)
       end)
 
       local guide = macros[curr.name]
 
-      if (guide == '')
-      merge(ast, (unpack(args)))
+      if guide == 'op' then
+        return _.mut_merge(ast,_.operator(curr))
+      end
+
       return ast
     else
       return curr
     end
   end
 
-  local flat_ast = analyze(parseres.ast)
-  print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-  table.print(flat_ast)
-  return flat_ast
+  local output = {
+    source = '',
+    result = {
+      error   = false,
+      message = ''
+    }
+  }
+
+  function line(str)
+    output.source = output.source .. str .. '\n'
+  end
+
+  function raw(str)
+    output.source = output.source .. str
+  end
+
+  local flat_tokens = analyze(parseres.ast)
+
+  for idx = 1, #flat_tokens do
+    local token = flat_tokens[idx]
+
+    if token.type == 'comment' then
+      line('--' .. token.value)
+    elseif token.type == 'raw' or
+           token.type == 'number' then
+      raw(token.value)
+    end
+  end
+
+  return output
 end
 
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
