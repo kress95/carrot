@@ -267,12 +267,13 @@ function lisp.lex(input)
       end
     elseif p_mode == 'astr' or p_mode == 'bstr' then
       if mode == 'escape' then
+        acc(idx)
         escape = true
       elseif escape or mode ~= 'normalize' then
         acc(idx)
         escape = false
       else
-        acc_reset('string')
+        acc_reset(p_mode)
         p_mode = 'normal'
       end
     end

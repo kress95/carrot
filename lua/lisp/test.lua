@@ -2,5 +2,17 @@ require 'lisp.lex'
 require 'lisp.parse'
 require 'lisp.build'
 
-print(lisp.build(lisp.parse(lisp.lex("(* 4 (+ 1 (+ 2 3)))"), true), true).source)
+local script =
+  lisp.build(
+    lisp.parse(
+      lisp.lex("\
+; olar mundo\
+(def d (let a 10 b 20 (\
+  (def c (+ a b))\
+  (* c b))))"),
+      true
+    ),
+  true).source
+print(script)
+
 

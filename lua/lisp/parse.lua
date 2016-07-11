@@ -45,6 +45,9 @@ lisp.macros_arity = {
   ['def'] = 2, -- define local value
   ['var'] = 2, -- define global value
   ['\\']  = 2, -- define anonymous function
+  ['if']  = 2, -- if statement as a expression
+  ['but'] = 2, -- unless statement as a expression
+  ['but'] = 2, -- unless statement as a expression
 
   -- variadic macros
   ['!']   = 0, -- returns first value that is not nil
@@ -139,6 +142,13 @@ function lisp.parse(lexres, debug)
       push_scope(build)
 
     elseif mode == 'close' then
+      if last_scope.type == 'call' and last_scope.name == nil then
+        last_scope.type = 'block'
+        last_scope.value[#last_scope.value] = {
+          type  = 'return',
+          value = last_scope.value[#last_scope.value]
+        }
+      end
       pop_scope()
     elseif mode == 'literal' then
       if last_scope.type == 'call' or
