@@ -1,78 +1,65 @@
---[[
-
-Lex rules:
-
-  ;   - comment, closed by a newline
-  \   - string escape
-  #   - comment form
-(   ) - usual form
-{   } - form for map-like tables
-[   ] - form for list-like tables
-'   ' - form for strings
-"   " - also a form for strings
-
-Anything not found in the list is tagged as a literal. (I'm a lazy bum)
-
---]]
+if lisp == nil then
+  lisp = {}
+end
 
 -- character byte codes
-local chars   = {}
-chars.space   = string.byte(' ')
-chars.tab     = string.byte('\t')
-chars.comma   = string.byte(';')
-chars.escape  = string.byte('\\')
-chars.hashtag = string.byte('#')
-chars.lparen  = string.byte('(')
-chars.rparen  = string.byte(')')
-chars.lcurly  = string.byte('{')
-chars.rcurly  = string.byte('}')
-chars.lsquare = string.byte('[')
-chars.rsquare = string.byte(']')
-chars.sqstr   = string.byte("'")
-chars.dqstr   = string.byte('"')
-chars.newline = string.byte('\n')
+local chars   = {
+  space   = string.byte(' '),
+  tab     = string.byte('\t'),
+  comma   = string.byte(';'),
+  escape  = string.byte('\\'),
+  hashtag = string.byte('#'),
+  lparen  = string.byte('('),
+  rparen  = string.byte(')'),
+  lcurly  = string.byte('{'),
+  rcurly  = string.byte('}'),
+  lsquare = string.byte('['),
+  rsquare = string.byte(']'),
+  sqstr   = string.byte("'"),
+  dqstr   = string.byte('"'),
+  newline = string.byte('\n')
+}
 
 -- mode changing characters
 local cmode  = {
-  normal  = {},
-  comment = {},
-  astr    = {},
-  bstr    = {}
+  -- normal mode
+  normal = {
+    [chars.comma]   = 'comment',
+    [chars.hashtag] = 'heredoc', -- no generalized rules
+    [chars.lparen]  = '<paren',
+    [chars.rparen]  = '>paren',
+    [chars.lcurly]  = '<curly',
+    [chars.rcurly]  = '>curly',
+    [chars.lsquare] = '<square',
+    [chars.rsquare] = '>square',
+    [chars.sqstr]   = 'astr',
+    [chars.dqstr]   = 'bstr',
+    [chars.newline] = 'ignore',
+    [chars.space]   = 'ignore',
+    [chars.tab]     = 'ignore'
+  },
+
+  -- comment mode
+  comment = {
+    [chars.newline] = 'normalize'
+  },
+
+  -- single quote string mode
+  astr = {
+    [chars.escape] = 'escape',
+    [chars.sqstr]  = 'normalize'
+  },
+
+  -- double quotes string mode
+  bstr = {
+    [chars.escape]  = 'escape',
+    [chars.newline] = 'newline',
+    [chars.dqstr]   = 'normalize'
+  }
 }
 
--- normal mode
-cmode.normal[chars.comma]   = 'comment'
-cmode.normal[chars.hashtag] = 'heredoc' -- no generalized rules
-cmode.normal[chars.lparen]  = '<paren'
-cmode.normal[chars.rparen]  = '>paren'
-cmode.normal[chars.lcurly]  = '<curly'
-cmode.normal[chars.rcurly]  = '>curly'
-cmode.normal[chars.lsquare] = '<square'
-cmode.normal[chars.rsquare] = '>square'
-cmode.normal[chars.sqstr]   = 'astr'
-cmode.normal[chars.dqstr]   = 'bstr'
-cmode.normal[chars.newline] = 'ignore'
-cmode.normal[chars.space]   = 'ignore'
-cmode.normal[chars.tab]     = 'ignore'
-
--- comment mode
-cmode.comment[chars.newline] = 'normalize'
-
--- single quote string mode
-cmode.astr[chars.escape] = 'escape'
-cmode.astr[chars.sqstr]  = 'normalize'
-
--- single quote string mode
-cmode.astr[chars.escape]  = 'escape'
-cmode.astr[chars.newline] = 'newline'
-cmode.astr[chars.sqstr]   = 'normalize'
-
--- double quotes string mode
-cmode.bstr[chars.escape]  = 'escape'
-cmode.bstr[chars.newline] = 'newline'
-cmode.bstr[chars.dqstr]   = 'normalize'
-
-function lex(input)
+-- lisp.lex, the lexer
+function lisp.lex(input)
   -- output object
   local output = {
     tokens = {},
@@ -164,6 +151,10 @@ function lex(input)
 
   -- main loop
   for idx = 1, input_length do
+
+    if mode == 'error' then
+      break
+    end
 
     -- current character and current mode
     local char = input:byte(idx)

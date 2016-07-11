@@ -1,67 +1,60 @@
--- monadic operators
-local monadic = {
-  '!',  -- revert number
-  '~',  -- revert boolean
-}
+if lisp == nil then
+  lisp = {}
+end
 
--- dyadic operators
-local dyadic = {
-  '--', -- string concatenation
-
-  -- numeric operators
-  '+',  -- plus
-  '-',  -- minus
-  '/',  -- div
-  '*',  -- mult
-  '^',  -- pow
-  '%',  -- remainder
-  '%%', -- mod
-
+-- operators arity
+lisp.macros_arity = {
   -- logic operators
-  '=',  -- equal
-  '!=', -- not equal
-  '>',  -- greater than
-  '<',  -- lesser than
-  '>=', -- equal or greater than
-  '<=', -- equal or lesser than
-  '&&', -- and operator
-  '||', -- or operator
-}
-
--- variadic operators
-local macros = {
-  '++', -- table concatenation
+  ['~~'] = 1, -- not operator
+  ['&&'] = 2, -- and operator
+  ['||'] = 2, -- or operator
 
   -- bitwise operators
-  '.&.',   -- bitwise &
-  '.|.',   -- bitwise |
-  '.^.',   -- bitwise ^
-  '.~.',   -- bitwise ~
-  '.<<.',  -- bitwise <<
-  '.>>.',  -- bitwise >>
-  '.>>>.', -- bitwise >>>
+  ['&:']  = 2, -- bitwise AND
+  ['|:']  = 2, -- bitwise OR
+  ['~:']  = 1, -- bitwise NOT
+  ['^:']  = 2, -- bitwise XOR
+  ['<<:'] = 2, -- bitwise LSHIFT
+  ['>>:'] = 2, -- bitwise RSHIFT
 
-  -- macros
-  '.',   -- partial application
-  '?',   -- do block when value is not nil
-  '|>',  -- pipe operator
-  '\\',  -- lambda function
-  'let', -- define value
-  'fun', -- define function
-  'def', -- define value (use let most of times pls)
-  'var'  -- define global value
+  -- comparison operators
+  ['=']  = 2, -- is equal?
+  ['!='] = 2, -- is not equal?
+  ['>']  = 2, -- is greater than?
+  ['<']  = 2, -- is lesser than?
+  ['>='] = 2, -- is equal or greater than?
+  ['<='] = 2, -- is equal or lesser than?
+
+  -- misc operators
+  ['++'] = 2, -- table merge
+  ['--'] = 2, -- string concatenation
+  ['?']  = 2, -- do block when value is not nil, `it = value`
+  ['$']  = 1, -- length operator
+
+  -- numeric operators
+  ['+']  = 2, -- addition
+  ['-']  = 2, -- subtraction
+  ['/']  = 2, -- division
+  ['*']  = 2, -- multiplication
+  ['^']  = 2, -- power
+  ['%']  = 2, -- remainder
+  ['%%'] = 2, -- modulo
+
+  -- fixed arity macros
+  ['fun'] = 3, -- define named function
+  ['def'] = 2, -- define local value
+  ['var'] = 2, -- define global value
+  ['\\']  = 2, -- define anonymous function
+
+  -- variadic macros
+  ['!']   = 0, -- returns first value that is not nil
+  ['.']   = 0, -- partial application
+  ['let'] = 0, -- lexical definition
+  ['|>']  = 0  -- pipe operator
 }
 
--- detector
-local detector = {}
-
-for k,v in pairs(monadic) do detector[v] = 'monadic' end
-for k,v in pairs(dyadic)  do detector[v] = 'dyadic'  end
-for k,v in pairs(macros)  do detector[v] = 'macro'   end
-
---~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-function parse(lexres)
+-- lisp.parse, the parser
+function lisp.parse(lexres)
   if lexres.result.error then
     return lexres
   end
@@ -88,7 +81,19 @@ function parse(lexres)
     table.remove(scopes)
   end
 
+  function err(message, token)
+    -- set skip mode
+    output.ast = {}
+    output.result.error = true
+    output.result.message = message .. ' (At ' .. token.position .. ')'
+  end
+
   for idx = 1, #lexres.tokens do
+
+    if output.result.error then
+      break
+    end
+
     local token = lexres.tokens[idx]
 
     -- last type
@@ -129,7 +134,46 @@ function parse(lexres)
     elseif mode == 'close' then
       pop_scope()
     elseif mode == 'literal' then
-      table.insert(last_scope.value, token)
+      if last_scope.type == 'call' or
+         last_scope.type == 'macro' then
+
+        local args = table.maxn(last_scope.value)
+
+        if args == 0 and
+           last_scope.name == nil then
+
+          if token.type ~= 'literal' then
+            last_scope.type = token.type
+            last_scope.value = token.value
+          else
+            local arity = lisp.macros_arity[token.value]
+
+            if arity ~= nil then
+              last_scope.type  = 'macro'
+              last_scope.arity = arity
+            end
+
+            last_scope.name = token.value
+          end
+        else
+          if last_scope.arity == nil or
+             last_scope.arity == 0 or
+             last_scope.arity > args then
+            table.insert(last_scope.value, token)
+          else
+            err(
+              'Wrong number of arguments for macro [' .. last_scope.name ..
+              '], expected ' .. last_scope.arity .. ' but got ' .. args + 1 ..
+              '.', token)
+          end
+        end
+      elseif last_scope.type == 'list' or
+             last_scope.type == 'table' or
+             last_scope.type == 'root' then
+        table.insert(last_scope.value, token)
+      else
+        err('Cannot call a [' .. last_scope.type .. '].', token)
+      end
     end
   end
 
