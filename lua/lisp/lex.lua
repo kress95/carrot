@@ -8,7 +8,6 @@ local chars   = {
   tab     = string.byte('\t'),
   comma   = string.byte(';'),
   escape  = string.byte('\\'),
-  hashtag = string.byte('#'),
   lparen  = string.byte('('),
   rparen  = string.byte(')'),
   lcurly  = string.byte('{'),
@@ -25,7 +24,6 @@ local cmode  = {
   -- normal mode
   normal = {
     [chars.comma]   = 'comment',
-    [chars.hashtag] = 'heredoc', -- no generalized rules
     [chars.lparen]  = '<paren',
     [chars.rparen]  = '>paren',
     [chars.lcurly]  = '<curly',
@@ -234,26 +232,9 @@ function lisp.lex(input)
             })
 
             mode = forms[table.maxn(forms)]
-
-            if mode == 'heredoc' then
-              table.insert(output.tokens, {
-                type     = mode,
-                value    = 'end',
-                position = pos(line, column)
-              })
-
-              table.remove(forms)
-            end
           else
             err(p_form, c_form)
           end
-        elseif mode == 'heredoc' then
-          table.insert(forms, mode)
-          table.insert(output.tokens, {
-            type     = mode,
-            value    = 'begin',
-            position = pos(line, column)
-          })
         elseif mode ~= 'ignore' then
           p_mode = mode
         end

@@ -127,7 +127,6 @@ function lisp.parse(lexres, debug)
   }
 
   local scopes = { output.ast }
-  local heredoc_depth = 0
 
   function push_scope(scope)
     table.insert(scopes, scope)
@@ -158,24 +157,20 @@ function lisp.parse(lexres, debug)
     -- define mode
     local mode = 'literal'
 
-    if token.type == 'heredoc' and token.value == 'begin' then
-      mode = 'heredoc'
-    elseif token.type == 'paren' and token.value == 'begin' then
+    if token.type == 'paren' and token.value == 'begin' then
       mode = 'call'
     elseif token.type == 'square' and token.value == 'begin' then
       mode = 'list'
     elseif token.type == 'curly' and token.value == 'begin' then
       mode = 'table'
-    elseif (token.type == 'heredoc' or
-            token.type == 'paren' or
+    elseif (token.type == 'paren' or
             token.type == 'square' or
             token.type == 'curly') and
             token.value == 'end' then
       mode = 'close'
     end
 
-    if mode == 'heredoc' or
-       mode == 'call' or
+    if mode == 'call' or
        mode == 'list' or
        mode == 'table' then
 
