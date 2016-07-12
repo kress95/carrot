@@ -6,10 +6,10 @@ end
 -- macro handling
 -------------------------------------------------------------------------------
 
-lisp.macros = {}
+lisp.macro = {}
 
 function op(symbol, arity, dynamic)
-  lisp.macros[symbol] = {
+  lisp.macro[symbol] = {
     type  = 'operator',
     arity = arity,
     name  = symbol
@@ -17,7 +17,7 @@ function op(symbol, arity, dynamic)
 end
 
 function macro(symbol, arity)
-  lisp.macros[symbol] = {
+  lisp.macro[symbol] = {
     type  = 'macro',
     arity = arity,
     name  = symbol
@@ -25,7 +25,7 @@ function macro(symbol, arity)
 end
 
 function alias(symbol, source)
-  lisp.macros[symbol] = lisp.macros[source]
+  lisp.macro[symbol] = lisp.macro[source]
 end
 
 -------------------------------------------------------------------------------
@@ -103,11 +103,7 @@ macro('if-else', 2) -- do B when A is truthy and C when A is falsy
 macro('cond',    2) -- does the first truthy tuple
 
 -- lisp.parse, the parser
-function lisp.parse(lexres, debug)
-  if debug == nil then
-    debug = true
-  end
-
+function lisp.parse(lexres)
   if lexres.result.error then
     return {
       ast    = {},
@@ -141,6 +137,14 @@ function lisp.parse(lexres, debug)
     output.ast = {}
     output.result.error = true
     output.result.message = message .. ' (At ' .. token.position .. ')'
+  end
+
+  function arity_err(last_scope, token)
+    err(
+      'Wrong number of arguments for macro [' .. last_scope.name ..
+      '], expected ' .. last_scope.arity .. ' but got ' ..
+      #last_scope.value .. '.', token
+    )
   end
 
   for idx = 1, #lexres.tokens do
@@ -189,14 +193,20 @@ function lisp.parse(lexres, debug)
           type  = 'return',
           value = last_scope.value[#last_scope.value]
         }
+      elseif last_scope.type == 'macro' then
+        if last_scope.arity ~= 0 and
+           #last_scope.value < last_scope.arity then
+          arity_err(last_scope, token)
+        end
       end
+
       pop_scope()
     elseif mode == 'literal' then
       if last_scope.type == 'call' or
          last_scope.type == 'macro' or
          last_scope.type == 'operator' then
 
-        local args = table.maxn(last_scope.value)
+        local args = #last_scope.value
 
         if args == 0 and
            last_scope.name == nil then
@@ -205,7 +215,7 @@ function lisp.parse(lexres, debug)
             last_scope.type = token.type
             last_scope.value = token.value
           else
-            local data = lisp.macros[token.value]
+            local data = lisp.macro[token.value]
 
             if data ~= nil then
               last_scope.type  = data.type
@@ -218,15 +228,12 @@ function lisp.parse(lexres, debug)
             last_scope.position = token.position
           end
         else
-          if last_scope.arity == nil or
-             last_scope.arity == 0 or
-             last_scope.arity > args then
-            table.insert(last_scope.value, token)
-          else
-            err(
-              'Wrong number of arguments for macro [' .. last_scope.name ..
-              '], expected ' .. last_scope.arity .. ' but got ' .. args + 1 ..
-              '.', token)
+          table.insert(last_scope.value, token)
+
+          if last_scope.arity ~= nil and
+             last_scope.arity ~= 0 and
+             #last_scope.value > last_scope.arity then
+            arity_err(last_scope, token)
           end
         end
       elseif last_scope.type == 'list' or

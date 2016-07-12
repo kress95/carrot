@@ -30,8 +30,8 @@ local cmode  = {
     [chars.rcurly]  = '>curly',
     [chars.lsquare] = '<square',
     [chars.rsquare] = '>square',
-    [chars.sqstr]   = 'astr',
-    [chars.dqstr]   = 'bstr',
+    [chars.sqstr]   = 'string-a',
+    [chars.dqstr]   = 'string-b',
     [chars.newline] = 'ignore',
     [chars.space]   = 'ignore',
     [chars.tab]     = 'ignore'
@@ -43,13 +43,13 @@ local cmode  = {
   },
 
   -- single quote string mode
-  astr = {
+  ['string-a'] = {
     [chars.escape] = 'escape',
     [chars.sqstr]  = 'normalize'
   },
 
   -- double quotes string mode
-  bstr = {
+  ['string-b'] = {
     [chars.escape]  = 'escape',
     [chars.newline] = 'newline',
     [chars.dqstr]   = 'normalize'
@@ -246,7 +246,7 @@ function lisp.lex(input)
       else
         acc(idx)
       end
-    elseif p_mode == 'astr' or p_mode == 'bstr' then
+    elseif p_mode == 'string-a' or p_mode == 'string-b' then
       if mode == 'escape' then
         acc(idx)
         escape = true
@@ -264,9 +264,9 @@ function lisp.lex(input)
 
   if forms_len > 0 then
     err(forms[forms_len])
-  elseif p_mode == 'astr' then
+  elseif p_mode == 'string-a' then
     err('single-quote')
-  elseif p_mode == 'bstr' then
+  elseif p_mode == 'string-b' then
     err('double-quotes')
   end
 

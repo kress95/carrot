@@ -48,7 +48,6 @@ require 'lisp.build'
     ),
   true).source]]
 
-local script = lisp.parse(lisp.lex('(print (+ 10 10))'))
+local script = lisp.build(lisp.parse(lisp.lex('(def a 10)')))
 table.print(script)
-
 
