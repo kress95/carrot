@@ -2,59 +2,105 @@ if lisp == nil then
   lisp = {}
 end
 
--- operators arity
-lisp.macros_arity = {
-  -- logic operators
-  ['~~'] = 1, -- not operator
-  ['&&'] = 2, -- and operator
-  ['||'] = 2, -- or operator
+-------------------------------------------------------------------------------
+-- macro handling
+-------------------------------------------------------------------------------
 
-  -- bitwise operators
-  ['&:']  = 2, -- bitwise AND
-  ['|:']  = 2, -- bitwise OR
-  ['~:']  = 1, -- bitwise NOT
-  ['^:']  = 2, -- bitwise XOR
-  ['<<:'] = 2, -- bitwise LSHIFT
-  ['>>:'] = 2, -- bitwise RSHIFT
+lisp.macros = {}
 
-  -- comparison operators
-  ['=']  = 2, -- is equal?
-  ['!='] = 2, -- is not equal?
-  ['>']  = 2, -- is greater than?
-  ['<']  = 2, -- is lesser than?
-  ['>='] = 2, -- is equal or greater than?
-  ['<='] = 2, -- is equal or lesser than?
+function op(symbol, arity, dynamic)
+  lisp.macros[symbol] = {
+    type  = 'operator',
+    arity = arity,
+    name  = symbol
+  }
+end
 
-  -- misc operators
-  ['++'] = 2, -- table merge
-  ['--'] = 2, -- string concatenation
-  ['?']  = 2, -- do block when value is not nil, `it = value`
-  ['$']  = 1, -- length operator
+function macro(symbol, arity)
+  lisp.macros[symbol] = {
+    type  = 'macro',
+    arity = arity,
+    name  = symbol
+  }
+end
 
-  -- numeric operators
-  ['+']  = 2, -- addition
-  ['-']  = 2, -- subtraction
-  ['/']  = 2, -- division
-  ['*']  = 2, -- multiplication
-  ['^']  = 2, -- power
-  ['%']  = 2, -- remainder
-  ['%%'] = 2, -- modulo
+function alias(symbol, source)
+  lisp.macros[symbol] = lisp.macros[source]
+end
 
-  -- fixed arity macros
-  ['fun'] = 3, -- define named function
-  ['def'] = 2, -- define local value
-  ['var'] = 2, -- define global value
-  ['\\']  = 2, -- define anonymous function
-  ['if']  = 2, -- if statement as a expression
-  ['but'] = 2, -- unless statement as a expression
-  ['but'] = 2, -- unless statement as a expression
+-------------------------------------------------------------------------------
+-- default macro set
+-------------------------------------------------------------------------------
 
-  -- variadic macros
-  ['!']   = 0, -- returns first value that is not nil
-  ['.']   = 0, -- partial application
-  ['let'] = 0, -- lexical definition
-  ['|>']  = 0  -- pipe operator
-}
+-- logic operators
+op('and', 2)
+op('or',  2)
+op('not', 1)
+
+alias('&&', 'and')
+alias('||', 'or')
+alias('~',  'not')
+
+-- bitwise operators
+macro('AND',    2)
+macro('OR',     2)
+macro('NOT',    1)
+macro('XOR',    2)
+macro('RSHIFT', 2)
+macro('LSHIFT', 2)
+
+alias('&:',  'AND')
+alias('|:',  'OR')
+alias('~:',  'NOT')
+alias('^:',  'XOR')
+alias('>>:', 'RSHIFT')
+alias('<<:', 'LSHIFT')
+
+-- comparison operators
+op('=',  2) -- is equal
+op('~=', 2) -- is not equal
+op('>',  2) -- greater than
+op('<',  2) -- lesser than
+op('>=', 2) -- greater or equal to
+op('<=', 2) -- lesser or equal to
+
+-- miscelaneous macros
+macro('++', 0) -- merge n tables
+macro('--', 0) -- merge n strings
+macro('?',  2) -- do block B when A is not nil, assigns 'it' to A
+macro('!',  2) -- returns first value that is not nil
+macro('#',  1) -- length operator
+macro('%%', 2) -- modulo
+macro('.',  2) -- partial application
+macro('|>', 0) -- pipe operator
+
+-- numeric operators
+op('+',  2) -- addition
+op('-',  2) -- subtraction
+op('/',  2) -- division
+op('*',  2) -- multiplication
+op('^',  2) -- power
+op('%',  2) -- remainder
+
+-- core macros definition
+macro('def', 2) -- define local value
+macro('fun', 3) -- named function definition
+macro('let', 0) -- lexical definition
+macro('do',  2) -- anonymous function definition
+
+alias('\\', 'do')
+
+-- module system
+macro('export',  2) -- exports B as A and export A as A when B is lacking
+macro('import',  2) -- imports file A as B
+macro('include', 2) -- includes A from B as a local
+macro('global',  2) -- like def, but defines a global value, pls never use it
+
+-- statements
+macro('if',      2) -- do B when A is truthy
+macro('but',     2) -- do B when A is falsy
+macro('if-else', 2) -- do B when A is truthy and C when A is falsy
+macro('cond',    2) -- does the first truthy tuple
 
 -- lisp.parse, the parser
 function lisp.parse(lexres, debug)
@@ -152,7 +198,8 @@ function lisp.parse(lexres, debug)
       pop_scope()
     elseif mode == 'literal' then
       if last_scope.type == 'call' or
-         last_scope.type == 'macro' then
+         last_scope.type == 'macro' or
+         last_scope.type == 'operator' then
 
         local args = table.maxn(last_scope.value)
 
@@ -163,14 +210,16 @@ function lisp.parse(lexres, debug)
             last_scope.type = token.type
             last_scope.value = token.value
           else
-            local arity = lisp.macros_arity[token.value]
+            local data = lisp.macros[token.value]
 
-            if arity ~= nil then
-              last_scope.type  = 'macro'
-              last_scope.arity = arity
+            if data ~= nil then
+              last_scope.type  = data.type
+              last_scope.arity = data.arity
+              last_scope.name  = data.name
+            else
+              last_scope.name     = token.value
             end
 
-            last_scope.name     = token.value
             last_scope.position = token.position
           end
         else
