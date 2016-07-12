@@ -48,6 +48,6 @@ require 'lisp.build'
     ),
   true).source]]
 
-local script = lisp.build(lisp.parse(lisp.lex('(def a 10)')))
+local script = lisp.build(lisp.parse(lisp.lex('(let a 10)')))
 table.print(script)
 
