@@ -7,7 +7,6 @@ require 'lisp.parse'
 -- local functions object
 local _ = {}
 
-
 -- raw token
 function _.raw(symbol, position)
   if position == nil then
