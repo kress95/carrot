@@ -71,7 +71,7 @@ macro('?',  2) -- do block B when A is not nil, assigns 'it' to A
 macro('!',  2) -- returns first value that is not nil
 macro('#',  1) -- length operator
 macro('%%', 2) -- modulo
-macro('.',  2) -- partial application
+macro('$',  2) -- partial application
 macro('|>', 0) -- pipe operator
 
 -- numeric operators
@@ -84,16 +84,13 @@ op('%',  2) -- remainder
 
 -- core macros definition
 macro('def', 2) -- define local value
-macro('fun', 3) -- named function definition
+macro('fun', 0) -- named function definition
 macro('let', 0) -- lexical definition
-macro('do',  2) -- anonymous function definition
+macro('do',  0) -- anonymous function definition
 
 alias('\\', 'do')
 
 -- module system
-macro('export',  2) -- exports B as A and export A as A when B is lacking
-macro('import',  2) -- imports file A as B
-macro('include', 2) -- includes A from B as a local
 macro('global',  2) -- like def, but defines a global value, pls never use it
 
 -- statements
@@ -101,6 +98,12 @@ macro('if',      2) -- do B when A is truthy
 macro('but',     2) -- do B when A is falsy
 macro('if-else', 2) -- do B when A is truthy and C when A is falsy
 macro('cond',    2) -- does the first truthy tuple
+
+-- blocked keywords
+macro('return', 0) -- returning is not allowed
+macro('break', 0)  -- breaking is not allowed
+macro('for', 0)    -- for iteration is not allowed
+
 
 -- lisp.parse, the parser
 function lisp.parse(lexres)

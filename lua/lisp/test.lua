@@ -36,18 +36,30 @@ require 'lisp.lex'
 require 'lisp.parse'
 require 'lisp.build'
 
---[[local script =
-  lisp.build(
-    lisp.parse(
-      lisp.lex("\
-; olar mundo\
-(def d (let a 10 b 20 (\
-  (def c (+ a b))\
-  (* c b))))"),
-      true
-    ),
-  true).source]]
+local src = [[
 
-local script = lisp.build(lisp.parse(lisp.lex('(let a 10)')))
-table.print(script)
+(fun fib [n]
+  (if-else (< n 3)
+    1
+    (+ (fib (- n 1)) (fib (- n 2)))))
+
+(print (fib 10))
+
+(print #length)
+(fun modulo [a b] (%% a b))
+
+
+(+ 10 (- 1 2))
+(&: 10 10)
+]]
+
+local results = lisp.build(lisp.parse(lisp.lex(src)))
+
+print('-----------')
+
+if results.result.error then
+  table.print(results.result.message)
+else
+  print(results.source)
+end
 

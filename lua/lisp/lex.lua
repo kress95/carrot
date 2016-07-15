@@ -208,6 +208,8 @@ function lisp.lex(input)
 
           if accum.value == 'false' or accum.value == 'true' then
             acc_type = 'boolean'
+          elseif accum.value == 'nil' then
+            acc_type = 'nil'
           elseif tonumber(accum.value) ~= nil then
             acc_type = 'number'
           end

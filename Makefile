@@ -58,8 +58,12 @@ SDL_DIR = ./vendor/sdl2/$(PLATFORM)/*
 # just a good name for calling the function that copies needed files
 initialize: ./lua/jit
 
+# starts repl
+repl:
+	$(LUA)
+
 # declare rules that are not files
-.PHONY: initialize help debug tests test run dist dirs clean
+.PHONY: initialize help debug tests test run dist dirs clean repl
 
 #==============================================================================
 
