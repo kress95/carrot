@@ -450,20 +450,6 @@ function lisp.build(parseres, debug)
     }
   end
 
-  -- length operator
-  macros['#'] = function (token, last)
-    if token.value[1].type ~= 'literal' then
-      return err(
-        token.value[1],
-        'Cannot inspect length of non [literal] values.'
-      )
-    end
-    return {
-      tk('#'),
-      token.value[1]
-    }
-  end
-
   macros['AND'] = function (token, last)
     return {
       tk('bit.band'),

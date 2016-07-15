@@ -69,7 +69,6 @@ macro('++', 0) -- merge n tables
 macro('--', 0) -- merge n strings
 macro('?',  2) -- do block B when A is not nil, assigns 'it' to A
 macro('!',  2) -- returns first value that is not nil
-macro('#',  1) -- length operator
 macro('%%', 2) -- modulo
 macro('$',  2) -- partial application
 macro('|>', 0) -- pipe operator
