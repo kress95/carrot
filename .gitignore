@@ -1,4 +1,6 @@
 /lua/jit
+/lua/jit/carrot/*.lua
+/lua/jit/game/*.lua
 /lua/jit/carrot/**/*.lua
 /lua/jit/game/**/*.lua
 /*.dll

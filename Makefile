@@ -54,17 +54,17 @@ GAME_OUT = $(GAME_IN:%.s2=%.lua)
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 lua/carrot/%.lua: lua/carrot/%.s2
-	mkdir -p $(dir $@)
+	@mkdir -p $(dir $@)
 	$(LUA) $(LISP) "$<" clean > $@
 
 lua/game/%.lua: lua/game/%.s2
-	mkdir -p $(dir $@)
+	@mkdir -p $(dir $@)
 	$(LUA) $(LISP) "$<" clean > $@
 
 
 lisp: $(CARROT_OUT) $(GAME_OUT)
-	mkdir -p $(dir $@)
-	$(LUA) $(LISP) "" > $@
+	@mkdir -p $(dir $@)
+	$(LUA) $(LISP) "" > lua/carrot/core.lua
 
 # copies luajit and sdl to root, the rule name is used
 ./lua/jit:
