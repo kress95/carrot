@@ -84,6 +84,8 @@ local src = [[
   (match 10 [10 (print 10)
              20 (print 20)]
             (print 30))
+
+  (fun >>= [x y] ((. x bind) y))
 ]]
 
 local results = lisp.build(lisp.parse(lisp.lex(src)))

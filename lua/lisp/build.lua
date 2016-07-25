@@ -9,7 +9,7 @@ require 'lisp.parse'
 -------------------------------------------------------------------------------
 
 
-function lisp.build(parseres, debug)
+function lisp.build(parseres, debug, clear)
   -- pass previous erros forward
   if parseres.result.error then
     return {
@@ -149,6 +149,10 @@ end
       message = { }
     }
   }
+
+  if clear == true then
+    output.source = ''
+  end
 
   -- write string to output, maps to token
   function write(token, str)
@@ -490,7 +494,7 @@ end
         tk('function'),
         delim_args(args[2].value),
         nl(),
-        neoblock(3, args),
+        traverse(orblock(neoblock(3, args))),
         nl(),
         tk('end')
       }
@@ -501,7 +505,7 @@ end
         delim_args(args[2].value),
         ident(1),
         nl(),
-        neoblock(3, args),
+        traverse(orblock(neoblock(3, args))),
         ident(-1),
         nl(),
         tk('end')
@@ -521,7 +525,7 @@ end
       tk('function'),
       delim_args(args[1].value),
       nl(),
-      neoblock(2, args),
+      traverse(orblock(neoblock(2, args))),
       nl(),
       tk('end')
     }
@@ -537,7 +541,7 @@ end
       tk('if '), traverse(args[1]), tk(' then'),
       ident(1),
       nl(),
-      neoblock(2, args),
+      traverse(orblock(neoblock(2, args))),
       ident(-1),
       nl(),
       tk('end'),
@@ -557,7 +561,7 @@ end
       tk('if not '), traverse(args[1]), tk(' then'),
       ident(1),
       nl(),
-      neoblock(2, args),
+      traverse(orblock(neoblock(2, args))),
       ident(-1),
       nl(),
       tk('end'),
@@ -802,7 +806,7 @@ end
 
   macros['?'] = function (token, last)
     local test  = traverse(token.value[1])
-    local block = neoblock(2, token.value)
+    local block = traverse(orblock(neoblock(2, token.value)))
 
     return {
       tk('(function(it)'),
@@ -811,7 +815,7 @@ end
       tk('if it ~= nil then'),
       ident(1),
       nl(),
-      traverse(block),
+      block,
       ident(-1),
       nl(),
       tk('end'),
@@ -886,7 +890,7 @@ end
       table.insert(output, tk('else'))
       table.insert(output, ident(1))
       table.insert(output, nl())
-      table.insert(output, traverse(neoblock(2, args)))
+      table.insert(output, traverse(orblock(neoblock(2, args))))
       table.insert(output, ident(-1))
       table.insert(output, nl())
     end
@@ -964,7 +968,7 @@ end
     table.insert(output, ident(1))
     table.insert(output, nl())
     if #args >= 3 then
-      table.insert(output, traverse(neoblock(3, args)))
+      table.insert(output, traverse(orblock(neoblock(3, args))))
     else
       table.insert(output, tk('return nil'))
     end
@@ -1237,11 +1241,25 @@ end
            token.type == 'nil' or
            token.type == 'number' then
       write(token, token.value)
+    elseif token.type == 'literal' then
+      local str = token.value
+      -- lisp case to snake case
+      str = string.gsub(str, '-', '_')
+      -- operator func name support
+      str = string.gsub(str, '+', '_plus_')
+      str = string.gsub(str, '=', '_eq_')
+      str = string.gsub(str, '>', '_more_')
+      str = string.gsub(str, '<', '_less_')
+      str = string.gsub(str, '!', '_not_')
+      str = string.gsub(str, '?', '_maybe_')
+      str = string.gsub(str, '\\$', '_partial_')
+        write(token, str)
     elseif token.type ~= nil then
       if type(token.value) == 'table' then
         table.print(token)
+      elseif type(token.value) == 'string' then
+        write(token, token.value)
       end
-      write(token, token.value)
     end
   end
 
