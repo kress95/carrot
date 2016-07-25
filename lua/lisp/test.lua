@@ -37,20 +37,53 @@ require 'lisp.parse'
 require 'lisp.build'
 
 local src = [[
+  ; simple fibonacci function that works
+  (fun fib [n]
+    (if (< n 3)
+      1
+      (+ (fib (- n 1)) (fib (- n 2)))))
 
-(fun fib [n]
-  (if-else (< n 3)
-    1
-    (+ (fib (- n 1)) (fib (- n 2)))))
+  ; testing fib
+  (print (fib 10))
 
-(print (fib 10))
+  ; optimized string concatenation
+  (print (++ 'hello' ' ' 'world'))
 
-(print #length)
-(fun modulo [a b] (%% a b))
+  ; let's define some locals
+  (def hello 'hello')
+  (def world 'world')
 
+  ; unoptimized string concatenation
+  (print (++ hello ' ' world))
 
-(+ 10 (- 1 2))
-(&: 10 10)
+  ; pipe and partial application test
+  (print (|> 10 ($ * 3) ($ / 2)))
+
+  ; recursive map function
+  (fun map [func list]
+    (def output {})
+    (fun recur [curr]
+       (if (<= curr (# list))
+         (((. table insert) output (func (at curr list)))
+          (recur (+ curr 1))
+          (output))))
+    (recur 1))
+
+  ; testing the map function
+  (let [list [1 2 3 ] ] (|> list ($ map ($ * 2)) (. table print)))
+  (|> [1 2 3] ($ map ($ * 2)) print)
+
+  (? 10 (* it 2))
+  (print (! 1 2 nil 3 nil))
+
+  (cond [(= 10 10) (print 10)
+         (= 10 20) (print 20)
+         (= 10 30) (print 30)]
+        (print 40))
+
+  (match 10 [10 (print 10)
+             20 (print 20)]
+            (print 30))
 ]]
 
 local results = lisp.build(lisp.parse(lisp.lex(src)))
@@ -62,4 +95,3 @@ if results.result.error then
 else
   print(results.source)
 end
-

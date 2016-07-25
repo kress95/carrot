@@ -1,21 +1,3 @@
---[[
-Remaining macros:
-
--- complex operators
-macro('cond',    2) -- does the first truthy tuple
-macro('?',  2)      -- do block B when A is not nil, assigns 'it' to A
-
--- dynamic operators
-macro('++', 0) -- merge n tables
-macro('--', 0) -- merge n strings
-
--- unplanned operators
-macro('|>', 0) -- pipe operator
-macro('$',  2) -- partial application
-macro('!',  2)      -- returns first value that is not nil
-
-]]
-
 if lisp == nil then
   lisp = {}
 end
@@ -44,7 +26,123 @@ function lisp.build(parseres, debug)
 
   -- output value
   local output = {
-    source  = '',
+    source  = [[
+if __lisp_global_methods__ == nil then
+  __mark_list__ = function (tbl)
+    setmetatable(tbl, { __is_list__ = true })
+    return tbl
+  end
+
+  __is_list__ = function (tbl)
+    return getmetatable(tbl).__is_list__ ==  true
+  end
+
+  __merge_tables__ = function (...)
+    local out  = { }
+    local args = {...}
+
+    for idx=1, #args do
+      local curr = args[idx]
+
+      for idx2=1, #curr do
+        table.insert(out, curr[idx2])
+      end
+    end
+
+    return out
+  end
+
+  __concat_str_list__ = function (...)
+    local args = {...}
+    local mode = false
+
+    for idx=1, #args do
+      if type(args[idx]) ~= 'string' then
+        mode = true
+        break
+      end
+    end
+
+    if mode == false then
+      local output = ''
+
+      for idx=1, #args do
+        output = output .. args[idx]
+      end
+
+      return output
+    else
+      local output = {}
+
+      for idx=1, #args do
+        local curr = args[idx]
+        for idx2=1, #curr do
+          table.insert(output, curr[idx2])
+        end
+      end
+
+      return output
+    end
+  end
+
+  __merge_tables__ = function (...)
+    local out  = { }
+    local args = ...
+
+    for idx=1, #args do
+      local curr = args[idx]
+
+      for k,v in pairs(curr) do
+        out[k] = v
+      end
+    end
+
+    return out
+  end
+
+  function __option__ = function (...)
+    local args = ...
+    local out  = nil
+
+    for idx=1, #args do
+      local value = args[idx]
+      if value ~= nil then
+        out = value
+      end
+    end
+
+    return out
+  end
+
+  __curry__ = function(func, ...)
+    local info     = debug.getinfo(func, 'u')
+    local isvararg = info.isvararg
+    local nparams  = info.nparams
+    local head     = { ... }
+
+    if isvararg or #head >= nparams then
+      return func(unpack(head))
+    end
+
+    return function(...)
+      local tail = { ... }
+
+      for idx=1, #tail do
+        table.insert(head, tail[idx])
+      end
+
+      if #head >= nparams then
+        return func(unpack(head))
+      end
+
+      return curry(func, unpack(head))
+    end
+  end
+
+  __lisp_global_methods__ = true
+end
+
+]],
     mapping = {},
     result  = {
       error   = false,
@@ -224,6 +322,70 @@ function lisp.build(parseres, debug)
     end
   end
 
+  function infer_operator(token)
+    if type(token.value) == 'string' then
+      local data = lisp.macro[token.value]
+
+      if data == nil then
+        return token
+      end
+
+      if data.type == 'operator' then
+        if data.arity == 1 then
+          return {
+            tk('(function(x) return '),
+            tk(data.name, 'operator'),
+            tk('x'),
+            tk(' end)')
+          }
+        elseif data.arity == 2 then
+          return {
+            tk('(function(y, x) return '),
+            tk('x'),
+            tk(data.name, 'operator'),
+            tk('y'),
+            tk(' end)')
+          }
+        end
+      elseif data.type == 'macro' and (
+             data.name == 'AND' or
+             data.name == 'OR' or
+             data.name == 'NOT' or
+             data.name == 'XOR' or
+             data.name == 'LSHIFT' or
+             data.name == 'RSHIFT' or
+             data.name == '%%') then
+
+        local value
+
+        if data.arity == 2 then
+          value = {
+            { position = '', type  = 'literal', value = 'x' },
+            { position = '', type  = 'literal', value = 'y' }
+          }
+        else
+          value = { { position = '', type  = 'literal', value = 'x' } }
+        end
+
+        local operation = traverse({
+          position = '',
+          type  = data.type,
+          arity = data.arity,
+          name  = data.name,
+          value = value
+        })
+
+        if data.arity == 2 then
+          return { tk('(function(y, x) return '), operation, tk(' end)') }
+        else
+          return { tk('(function(x) return '), operation, tk(' end)') }
+        end
+      end
+    end
+
+    return token
+  end
+
   -----------------------------------------------------------------------------
   -- native macros
   -----------------------------------------------------------------------------
@@ -232,30 +394,35 @@ function lisp.build(parseres, debug)
 
   -- (let name value ... block) -> (function(name) return block end)(value)
   function macros.let(token, last)
-    local args   = token.value
-    local length = (#args - 1) / 2
-    local block  = args[#args]
+    if token.value[1].type ~= 'list' then
+      return err(token.value[1], 'Arguments list must be of [list] type.')
+    end
 
+    local args  = token.value[1].value
+    local block = neoblock(2, token.value)
+
+    local length = #args / 2
     local names  = {}
     local values = {}
 
-    if length % 2 ~= 1 then
+    if (length - 1) % 2 == 1 then
       return err(token,
         '[let] wrongly used, please use a key-value pattern ' ..
         'with the last param being a block.')
     end
 
     for idx=1, length do
-      local key = args[(((idx - 1) * 2) + 1)]
+      local base  = ((idx - 1) * 2) + 1
+      local key   = args[base]
+      local value = args[base + 1]
 
       if key.type ~= 'literal' then
         return err(key,
         'Cannot define a [' .. key.type .. '] to a value.')
       end
 
-
-      table.insert(names, key)
-      table.insert(values, args[(((idx - 1) * 2) + 2)])
+      table.insert(names,  key)
+      table.insert(values, value)
     end
 
     return {
@@ -316,8 +483,6 @@ function lisp.build(parseres, debug)
 
     if args[2].type ~= 'list' then
       return err(args[2], 'Arguments list must be of [list] type.')
-    else
-      args[2] = traverse(args[2])
     end
 
     if last then
@@ -350,8 +515,6 @@ function lisp.build(parseres, debug)
 
     if args[1].type ~= 'list' then
       return err(args[1], 'Arguments list must be of [list] type.')
-    else
-      args[1] = traverse(args[1])
     end
 
     return {
@@ -364,8 +527,8 @@ function lisp.build(parseres, debug)
     }
   end
 
-  -- if expression
-  macros['if'] = function (token, last)
+  -- (when test then...) -> eval(then) | nil
+  macros['when'] = function (token, last)
     local args = token.value
     return {
       tk('(function()'),
@@ -384,9 +547,41 @@ function lisp.build(parseres, debug)
     }
   end
 
-  -- if expression
-  macros['if-else'] = function (token, last)
+  -- but expression, does action only when falsy
+  macros['when-not'] = function (token, last)
     local args = token.value
+    return {
+      tk('(function()'),
+      ident(1),
+      nl(),
+      tk('if not '), traverse(args[1]), tk(' then'),
+      ident(1),
+      nl(),
+      neoblock(2, args),
+      ident(-1),
+      nl(),
+      tk('end'),
+      ident(-1),
+      nl(),
+      tk('end)()')
+    }
+  end
+
+  -- (if test then else?) -> eval(then) | eval(else) | nil
+  macros['if'] = function (token, last)
+    local args   = token.value
+    local length = #args
+
+    if length == 2 then
+      return macros['when'](token, last)
+    elseif length ~= 3 then
+      return err(
+        'Wrong number of arguments for macro [' .. last_scope.name ..
+        '], expected ' .. token.arity .. ' but got ' .. length .. '.',
+        token
+      )
+    end
+
     return {
       tk('(function()'),
       ident(1),
@@ -401,26 +596,6 @@ function lisp.build(parseres, debug)
       ident(1),
       nl(),
       traverse(orblock(args[3])),
-      ident(-1),
-      nl(),
-      tk('end'),
-      ident(-1),
-      nl(),
-      tk('end)()')
-    }
-  end
-
-  -- but expression, does action only when falsy
-  macros['but'] = function (token, last)
-    local args = token.value
-    return {
-      tk('(function()'),
-      ident(1),
-      nl(),
-      tk('if not '), traverse(args[1]), tk(' then'),
-      ident(1),
-      nl(),
-      neoblock(2, args),
       ident(-1),
       nl(),
       tk('end'),
@@ -447,6 +622,24 @@ function lisp.build(parseres, debug)
       tk(')'),
       tk('%', 'operator'),
       b
+    }
+  end
+
+  -- get length
+  macros['#'] = function (token, last)
+    return {
+      tk('#'),
+      traverse(token.value)
+    }
+  end
+
+  -- get length
+  macros['at'] = function (token, last)
+    return {
+      traverse(token.value[2]),
+      tk('['),
+      traverse(token.value[1]),
+      tk(']')
     }
   end
 
@@ -490,6 +683,307 @@ function lisp.build(parseres, debug)
       tk('bit.rshift'),
       delim_args({traverse(token.value[1]), traverse(token.value[2])})
     }
+  end
+
+  macros['++'] = function (token, last)
+    local args   = {}
+    local length = #token.value
+    local pure   = true
+
+
+    for idx=1, length do
+      local param = traverse(token.value[idx])
+
+      table.insert(args, param)
+
+      if param.type ~= 'string-a' and param.type ~= 'string-b' then
+        pure = false
+      end
+    end
+
+    if pure then
+      local concat_list = {}
+      for idx=1, length do
+        table.insert(concat_list, traverse(args[idx]))
+        if idx ~= length then
+          table.insert(concat_list, tk('..', 'operator'))
+        end
+      end
+
+      return delim_math(concat_list)
+    else
+      return { tk('__concat_str_list__'), delim_args(args) }
+    end
+  end
+
+  macros['--'] = function (token, last)
+    local args   = {}
+    local length = #token.value
+
+    for idx=1, length do
+      table.insert(args, traverse(token.value[idx]))
+    end
+
+    return { tk('__merge_tables__'), delim_args(args) }
+  end
+
+  macros['$'] = function (token, last)
+    local args = {}
+
+    for idx=1, #token.value do
+      table.insert(args, infer_operator(traverse(token.value[idx])))
+    end
+
+    return {
+      tk('__curry__'), delim_args(args)
+    }
+  end
+
+  macros['|>'] = function (token, last)
+    local args   = token.value
+
+    local output = {
+      tk('(function(__piped__)'),
+      ident(1),
+      nl()
+    }
+
+    for idx=2, #args do
+      table.insert(output, tk('__piped__'))
+      table.insert(output, tk('=', 'operator'))
+      table.insert(output, infer_operator(traverse(args[idx])))
+      table.insert(output, tk('(__piped__)'))
+      table.insert(output, nl())
+    end
+
+    table.insert(output, tk('return __piped__'))
+    table.insert(output, ident(-1))
+    table.insert(output, nl())
+    table.insert(output, tk('end)('))
+    table.insert(output, traverse(args[1]))
+    table.insert(output, tk(')'))
+
+    return output
+  end
+
+  macros['.'] = function (token, last)
+    local output = '' .. token.value[1].value
+    local args   = token.value
+
+    for idx=2, #args do
+      output = output .. '.' ..  args[idx].value
+    end
+
+    return {
+      type     = 'literal',
+      value    = output,
+      position = token.position
+    }
+  end
+
+  macros[':'] = function (token, last)
+    local output = '' .. token.value[1].value
+    local args   = token.value
+
+    for idx=2, #args do
+      if idx == #args then
+        output = output .. ':' ..  args[idx].value
+      else
+        output = output .. '.' ..  args[idx].value
+      end
+    end
+
+    return {
+      type     = 'literal',
+      value    = output,
+      position = token.position
+    }
+  end
+
+  macros['?'] = function (token, last)
+    local test  = traverse(token.value[1])
+    local block = neoblock(2, token.value)
+
+    return {
+      tk('(function(it)'),
+      ident(1),
+      nl(),
+      tk('if it ~= nil then'),
+      ident(1),
+      nl(),
+      traverse(block),
+      ident(-1),
+      nl(),
+      tk('end'),
+      ident(-1),
+      nl(),
+      tk('end)('),
+      test,
+      tk(')')
+    }
+  end
+
+  macros['!'] = function (token, last)
+    local args = {}
+
+    for idx=1, #token.value do
+      table.insert(args, infer_operator(traverse(token.value[idx])))
+    end
+
+    return {
+      tk('__option__'), delim_args(args)
+    }
+  end
+
+  function macros.cond(token, last)
+    local args   = token.value
+    local length = #args
+
+    local output = {
+      tk('(function()'),
+      ident(1),
+      nl()
+    }
+
+    if args[1].type ~= 'list' then
+      return err(args[1], 'Arguments list must be of [list] type.')
+    end
+
+    local tests = args[1].value
+
+    local length = #tests / 2
+
+    if (length - 1) % 2 == 1 then
+      return err(tests[1],
+        '[cond] wrongly used, please use a key-value pattern ' ..
+        'with the last param being a block.')
+    end
+
+    for idx=1, length do
+      local base  = ((idx - 1) * 2) + 1
+
+      local test  = tests[base]
+      local block = tests[base + 1]
+
+      if idx == 1 then
+        table.insert(output, tk('if '))
+        table.insert(output, traverse(test))
+        table.insert(output, tk(' then'))
+      else
+        table.insert(output, tk('elseif '))
+        table.insert(output, traverse(test))
+        table.insert(output, tk(' then'))
+      end
+
+      table.insert(output, ident(1))
+      table.insert(output, nl())
+      table.insert(output, traverse(orblock(block)))
+      table.insert(output, ident(-1))
+      table.insert(output, nl())
+    end
+
+    if #args >= 2 then
+      table.insert(output, tk('else'))
+      table.insert(output, ident(1))
+      table.insert(output, nl())
+      table.insert(output, traverse(neoblock(2, args)))
+      table.insert(output, ident(-1))
+      table.insert(output, nl())
+    end
+
+    table.insert(output, tk('end'))
+    table.insert(output, ident(-1))
+    table.insert(output, nl())
+    table.insert(output, tk('end)'))
+
+    return output
+  end
+
+
+  function macros.match(token, last)
+    local args   = token.value
+    local length = #args
+
+    local output = {
+      tk('(function(__ref__)'),
+      ident(1),
+      nl(),
+      tk('local __jumptable__ = {'),
+      ident(1),
+      nl(),
+    }
+
+    if args[2].type ~= 'list' then
+      return err(args[2], 'Arguments list must be of [list] type.')
+    end
+
+    local tests = args[2].value
+
+    local length = #tests / 2
+
+    if (length - 1) % 2 == 0 then
+      return err(args[2],
+        '[match] wrongly used, please use a key-value pattern ' ..
+        'with the last param being a block.')
+    end
+
+    for idx=1, length do
+      local base  = ((idx - 1) * 2) + 1
+
+      local key   = tests[base]
+      local value = tests[base + 1]
+
+      table.insert(output, tk('['))
+      table.insert(output, traverse(key))
+      table.insert(output, tk(']'))
+      table.insert(output, tk('=', 'operator'))
+      table.insert(output, tk('function()'))
+      table.insert(output, ident(1))
+      table.insert(output, nl())
+      table.insert(output, traverse(orblock(value)))
+      table.insert(output, ident(-1))
+      table.insert(output, nl())
+      table.insert(output, tk('end'))
+
+      if idx < length then
+        table.insert(output, tk(','))
+        table.insert(output, nl())
+      end
+
+    end
+
+    table.insert(output, ident(-1))
+    table.insert(output, nl())
+    table.insert(output, tk('}'))
+    table.insert(output, nl())
+    table.insert(output, nl())
+    table.insert(output, tk('local __match__ = __jumptable__[__ref__]'))
+    table.insert(output, nl())
+    table.insert(output, nl())
+    table.insert(output, tk('if __match__ == nil then'))
+    table.insert(output, ident(1))
+    table.insert(output, nl())
+    if #args >= 3 then
+      table.insert(output, traverse(neoblock(3, args)))
+    else
+      table.insert(output, tk('return nil'))
+    end
+    table.insert(output, ident(-1))
+    table.insert(output, nl())
+    table.insert(output, tk('else'))
+    table.insert(output, ident(1))
+    table.insert(output, nl())
+    table.insert(output, tk('return __match__()'))
+    table.insert(output, ident(-1))
+    table.insert(output, nl())
+    table.insert(output, tk('end'))
+    table.insert(output, ident(-1))
+    table.insert(output, nl())
+    table.insert(output, tk('end)('))
+    table.insert(output, analyze(args[1]))
+    table.insert(output, tk(')'))
+
+    return output
   end
 
   -----------------------------------------------------------------------------
@@ -546,6 +1040,10 @@ function lisp.build(parseres, debug)
       local value = traverse(token.value, last)
 
       if token.type == 'operator' then
+        if token.name == '=' then
+          token.name = '=='
+        end
+
         local a = value[1]
         local b = value[2]
 
@@ -559,16 +1057,105 @@ function lisp.build(parseres, debug)
 
         return { a, strip(token), b }
       elseif token.type == 'call' then
-        return {
-          strip(token),
-          delim_args(value)
-        }
+        if #value == 0 then
+          return strip(token)
+        else
+          return {
+            strip(token),
+            delim_args(value)
+          }
+        end
       elseif token.type == 'return' then
         return {
           tk('return '),
           traverse(token.value, true)
         }
+      elseif token.type == 'list' then
+        local output = {
+          tk('__mark_list__'),
+          tk('({'),
+          ident(1),
+          nl()
+        }
+
+        for idx=1, #token.value do
+          table.insert(output, traverse(token.value[idx]))
+
+          if idx < #token.value then
+            table.insert(output, tk(','))
+            table.insert(output, nl())
+          end
+        end
+
+        table.insert(output, ident(-1))
+        table.insert(output, nl())
+        table.insert(output, tk('})'))
+
+        return output
+      elseif token.type == 'table' then
+        local output = {
+          tk('{'),
+          ident(1),
+          nl()
+        }
+        local length = (#token.value / 2)
+
+        for idx=1, length do
+          local index = ((idx - 1) * 2) + 1
+          local key   = traverse(token.value[index])
+          local value = traverse(token.value[index + 1])
+
+          if key.type == 'literal' then
+            table.insert(output, key)
+          else
+            table.insert(output, tk('['))
+            table.insert(output, key)
+            table.insert(output, tk(']'))
+          end
+
+            table.insert(output, tk('=', 'operator'))
+            table.insert(output, value)
+
+          if idx < length then
+            table.insert(output, tk(','))
+            table.insert(output, nl())
+          end
+        end
+
+        table.insert(output, ident(-1))
+        table.insert(output, nl())
+        table.insert(output, tk('}'))
+
+        return output
       elseif token.type == 'root' or token.type == 'block' then
+
+        if token.type == 'block' then
+          local func = traverse(token.value[1], last)
+
+          if type(func) == 'table' and func.type == 'literal' then
+            local args = {}
+
+            function remove_ret(token)
+              if token.type == 'return' then
+                return token.value
+              else
+                return token
+              end
+            end
+
+            for idx=2, #token.value do
+              table.insert(args, remove_ret(token.value[idx]))
+            end
+
+            return traverse({
+              type     = 'call',
+              position = token.position,
+              name     = func.value,
+              value    = args
+            })
+          end
+        end
+
         if type(token.value) == 'table' and token.value[1] ~= nil then
           return separe(value, nl())
         else

@@ -67,10 +67,10 @@ op('<=', 2) -- lesser or equal to
 -- miscelaneous macros
 macro('++', 0) -- merge n tables
 macro('--', 0) -- merge n strings
-macro('?',  2) -- do block B when A is not nil, assigns 'it' to A
-macro('!',  2) -- returns first value that is not nil
+macro('?',  0) -- do block B when A is not nil, assigns 'it' to A
+macro('!',  0) -- returns first value that is not nil
 macro('%%', 2) -- modulo
-macro('$',  2) -- partial application
+macro('$',  0) -- partial application
 macro('|>', 0) -- pipe operator
 
 -- numeric operators
@@ -86,23 +86,26 @@ macro('def', 2) -- define local value
 macro('fun', 0) -- named function definition
 macro('let', 0) -- lexical definition
 macro('do',  0) -- anonymous function definition
-
+macro('.',   0) -- joins literals togheter
+macro(':',   0) -- joins literals togheter
+macro('#',   1) -- gets length
+macro('at',  2) -- gets item at
 alias('\\', 'do')
 
 -- module system
 macro('global',  2) -- like def, but defines a global value, pls never use it
 
 -- statements
-macro('if',      2) -- do B when A is truthy
-macro('but',     2) -- do B when A is falsy
-macro('if-else', 2) -- do B when A is truthy and C when A is falsy
-macro('cond',    2) -- does the first truthy tuple
+macro('when',     2) -- (when A B...) yields B when A is false
+macro('when-not', 2) -- do B when A is falsy
+macro('if',       2) -- do B when A is truthy and C when A is falsy
+macro('cond',     0) -- does the first truthy tuple
+macro('match',    0) -- does pattern matching
 
 -- blocked keywords
 macro('return', 0) -- returning is not allowed
 macro('break', 0)  -- breaking is not allowed
 macro('for', 0)    -- for iteration is not allowed
-
 
 -- lisp.parse, the parser
 function lisp.parse(lexres)
