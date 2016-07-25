@@ -1,8 +1,8 @@
+/lua/carrot/*.lua
+/lua/game/*.lua
+/lua/carrot/**/*.lua
+/lua/game/**/*.lua
 /lua/jit
-/lua/jit/carrot/*.lua
-/lua/jit/game/*.lua
-/lua/jit/carrot/**/*.lua
-/lua/jit/game/**/*.lua
 /*.dll
 /*.exe
 /luajit
