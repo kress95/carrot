@@ -39,12 +39,29 @@ endif
 LUA = ./luajit
 LUA_DIR = ./vendor/luajit/$(PLATFORM)/*
 SDL_DIR = ./vendor/sdl2/$(PLATFORM)/*
+LISP = "./lua/lisp/lisp.lua"
+
+CARROT_IN  = $(shell find lua/carrot -name "*.s2" -type f | sort)
+CARROT_OUT = $(CARROT_IN:%.s2=%.lua)
+
+GAME_IN  = $(shell find lua/game -name "*.s2" -type f | sort)
+GAME_OUT = $(GAME_IN:%.s2=%.lua)
 
 #==============================================================================
 
 #==============================================================================
 # INTERNALS
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+lua/carrot/%.lua: lua/carrot/%.s2
+	@mkdir -p $(dir $@)
+	$(LUA) $(LISP) "$<" clean > $@
+
+lua/game/%.lua: lua/game/%.s2
+	@mkdir -p $(dir $@)
+	$(LUA) $(LISP) "$<" clean > $@
+
+lisp: $(CARROT_OUT) $(GAME_OUT)
 
 # copies luajit and sdl to root, the rule name is used
 ./lua/jit:
@@ -63,7 +80,7 @@ repl:
 	$(LUA)
 
 # declare rules that are not files
-.PHONY: initialize help debug tests test run dist dirs clean repl
+.PHONY: initialize help debug tests test run dist dirs clean repl lisp
 
 #==============================================================================
 
@@ -72,7 +89,7 @@ repl:
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 # builds everything without debug information
-default:
+default: lisp
 
 # shows help information
 help:
@@ -99,7 +116,6 @@ debug:
 
 # run tests, returns test result
 tests: initialize
-	$(LUA) "./lua/lisp/test.lua"
 
 # run specified on FILE variable
 test:

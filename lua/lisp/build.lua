@@ -1218,13 +1218,42 @@ end
   local iterable   = flatten(codegen_tree)
   local identation = 0
 
+  local colon = string.byte(':')
+  local warnstr = false
+
   for idx=1, #iterable do
     local token = iterable[idx]
 
     if token.type == 'string-a' then
-      write(token, "'" .. token.value .. "'")
+      local str = ''
+      local t   = {}
+      local function helper(line) table.insert(t, line) return "" end
+      helper((token.value:gsub("(.-)\r?\n", helper)))
+
+      for idx=1, #t do
+        str = str .. t[idx]:gsub("^%s*(.-)%s*$", "%1")
+        if idx < #t then
+          str = str .. '\\\n'
+        end
+      end
+
+      warnstr = true
+
+      write(token, "'" .. str .. "'")
     elseif token.type == 'string-b' then
-      write(token, '"' .. token.value .. '"')
+      local str = ''
+      local t   = {}
+      local function helper(line) table.insert(t, line) return "" end
+      helper((token.value:gsub("(.-)\r?\n", helper)))
+
+      for idx=1, #t do
+        str = str .. t[idx]
+        if idx < #t then
+          str = str .. '\\\n'
+        end
+      end
+
+      write(token, '"' .. str .. '"')
     elseif token.type == 'operator' then
       write(token, ' ' .. token.value .. ' ')
     elseif token.type == 'comment' then
@@ -1243,26 +1272,83 @@ end
       write(token, token.value)
     elseif token.type == 'literal' then
       local str = token.value
+
       -- lisp case to snake case
-      str = string.gsub(str, '-', '_')
+      str = str:gsub('-', '_')
+
       -- operator func name support
-      str = string.gsub(str, '+', '_plus_')
-      str = string.gsub(str, '=', '_eq_')
-      str = string.gsub(str, '>', '_more_')
-      str = string.gsub(str, '<', '_less_')
-      str = string.gsub(str, '!', '_not_')
-      str = string.gsub(str, '?', '_maybe_')
-      str = string.gsub(str, '\\$', '_partial_')
-        write(token, str)
+      str = str:gsub('+', '_plus_')
+      str = str:gsub('=', '_eq_')
+      str = str:gsub('>', '_more_')
+      str = str:gsub('<', '_less_')
+      str = str:gsub('!', '_not_')
+      str = str:gsub('?', '_maybe_')
+      str = str:gsub('\\$', '_partial_')
+
+      if str:byte(1) == colon or str:byte(#str) == colon then
+        str = "'" .. str:gsub(':', '') .. "'"
+      end
+
+      write(token, str)
     elseif token.type ~= nil then
       if type(token.value) == 'table' then
-        table.print(token)
+        warn('[warn] Ignoring some token.\n')
       elseif type(token.value) == 'string' then
         write(token, token.value)
       end
     end
   end
 
+  if warnstr then
+    warn('Please stop using single quote strings. They are deprecated.')
+  end
+
   -- return output
   return output
 end
+
+warn = function(...)
+  local args = { ... }
+  for idx=1, #args do
+    io.stderr:write(args[idx])
+    if idx < #args then
+      io.stderr:write(' ')
+    end
+  end
+  io.stderr:write('\n')
+end
+
+table.print = function(t)
+  local print_r_cache={}
+  local function sub_print_r(t,indent)
+    if (print_r_cache[tostring(t)]) then
+      warn(indent.."*"..tostring(t))
+    else
+      print_r_cache[tostring(t)]=true
+      if (type(t)=="table") then
+        for pos,val in pairs(t) do
+          if (type(val)=="table") then
+            warn(indent.."["..pos.."] => "..tostring(t).." {")
+            sub_print_r(val,indent..string.rep(" ",string.len(pos)+8))
+            warn(indent..string.rep(" ",string.len(pos)+6).."}")
+          elseif (type(val)=="string") then
+            warn(indent.."["..pos..'] => "'..val..'"')
+          else
+            warn(indent.."["..pos.."] => "..tostring(val))
+          end
+        end
+      else
+        warn(indent..tostring(t))
+      end
+    end
+  end
+  if (type(t)=="table") then
+    warn(tostring(t).." {")
+    sub_print_r(t,"  ")
+    warn("}")
+  else
+    sub_print_r(t,"  ")
+  end
+  warn()
+end
+
