@@ -54,14 +54,17 @@ GAME_OUT = $(GAME_IN:%.s2=%.lua)
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 lua/carrot/%.lua: lua/carrot/%.s2
-	@mkdir -p $(dir $@)
+	mkdir -p $(dir $@)
 	$(LUA) $(LISP) "$<" clean > $@
 
 lua/game/%.lua: lua/game/%.s2
-	@mkdir -p $(dir $@)
+	mkdir -p $(dir $@)
 	$(LUA) $(LISP) "$<" clean > $@
 
+
 lisp: $(CARROT_OUT) $(GAME_OUT)
+	mkdir -p $(dir $@)
+	$(LUA) $(LISP) "" > $@
 
 # copies luajit and sdl to root, the rule name is used
 ./lua/jit:
@@ -79,8 +82,12 @@ initialize: ./lua/jit
 repl:
 	$(LUA)
 
+build: lisp
+
+.SILENT: lisp
+
 # declare rules that are not files
-.PHONY: initialize help debug tests test run dist dirs clean repl lisp
+.PHONY: initialize help debug tests test run dist dirs clean repl lisp build
 
 #==============================================================================
 
@@ -89,7 +96,7 @@ repl:
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 # builds everything without debug information
-default: lisp
+default: build
 
 # shows help information
 help:

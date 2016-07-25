@@ -1,3 +1,4 @@
+(require "carrot.core")
 
 ; simple fibonacci function that works
 (fun fib [n]
