@@ -9,14 +9,14 @@
 (print (fib 10))
 
 ; optimized string concatenation
-(print (++ 'hello' ' ' 'world'))
+(print (++ "hello" " " "world"))
 
-; let's define some locals
-(def hello 'hello')
-(def world 'world')
+; let"s define some locals
+(def hello "hello")
+(def world "world")
 
 ; unoptimized string concatenation
-(print (++ hello ' ' world))
+(print (++ hello " " world))
 
 ; pipe and partial application test
 (print (|> 10 ($ * 3) ($ / 2)))
@@ -32,7 +32,7 @@
 (recur 1))
 
 ; testing the map function
-(let [list [1 2 3 ] ] (|> list ($ map ($ * 2)) (. table print)))
+(let [list [1 2 3]] (|> list ($ map ($ * 2)) (. table print)))
 (|> [1 2 3] ($ map ($ * 2)) print)
 
 (? 10 (* it 2))
