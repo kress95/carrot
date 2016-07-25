@@ -464,7 +464,7 @@ end
   function macros.global(token, last)
     local args = traverse(token.value)
 
-    if args[1].type ~= 'literal' then
+    if args[1].type ~= nil and args[1].type ~= 'literal' then
       return err(
         args[1],
         'Cannot define a [' .. args[1].type .. '] to a value.'
@@ -478,7 +478,9 @@ end
   function macros.fun(token, last)
     local args = token.value
 
-    if args[1].type ~= 'literal' then
+    local name = traverse(args[1])
+
+    if name.type ~= 'literal' then
       return err(
         args[1],
         'Cannot define a function with a [' .. args[1].type .. '] name.'
@@ -494,18 +496,18 @@ end
         tk('function'),
         delim_args(args[2].value),
         nl(),
-        traverse(orblock(neoblock(3, args))),
+        traverse(neoblock(3, args)),
         nl(),
         tk('end')
       }
     else
       return {
         tk('function '),
-        args[1],
+        name,
         delim_args(args[2].value),
         ident(1),
         nl(),
-        traverse(orblock(neoblock(3, args))),
+        traverse(neoblock(3, args)),
         ident(-1),
         nl(),
         tk('end')
@@ -525,7 +527,7 @@ end
       tk('function'),
       delim_args(args[1].value),
       nl(),
-      traverse(orblock(neoblock(2, args))),
+      traverse(neoblock(2, args)),
       nl(),
       tk('end')
     }
@@ -541,7 +543,7 @@ end
       tk('if '), traverse(args[1]), tk(' then'),
       ident(1),
       nl(),
-      traverse(orblock(neoblock(2, args))),
+      traverse(neoblock(2, args)),
       ident(-1),
       nl(),
       tk('end'),
@@ -986,6 +988,40 @@ end
     table.insert(output, tk('end)('))
     table.insert(output, analyze(args[1]))
     table.insert(output, tk(')'))
+
+    return output
+  end
+
+  function macros.module(token, last)
+    local output   = {}
+    local args     = token.value
+    local location = ''
+
+    for idx=1, #args do
+      local name = traverse(args[idx]).value
+
+      if location == '' then
+        location = name
+      else
+        location = location .. '.' .. name
+      end
+
+      table.insert(output, tk('if '))
+      table.insert(output, tk(location))
+      table.insert(output, tk('==', 'operator'))
+      table.insert(output, tk('nil then'))
+      table.insert(output, ident(1))
+      table.insert(output, nl())
+      table.insert(output, tk(location))
+      table.insert(output, tk('=', 'operator'))
+      table.insert(output, tk('{}'))
+      table.insert(output, ident(-1))
+      table.insert(output, nl())
+      table.insert(output, tk('end'))
+      if idx < #args then
+        table.insert(output, nl())
+      end
+    end
 
     return output
   end

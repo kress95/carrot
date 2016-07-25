@@ -1,0 +1,10 @@
+(module prelude list)
+
+(fun (. prelude list map) [func list]
+  (def output {})
+  (fun recur [curr]
+    (if (<= curr (# list))
+     (((. table insert) output (func (at curr list)))
+      (recur (+ curr 1))
+      (output))))
+  (recur 1))

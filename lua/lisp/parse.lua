@@ -101,6 +101,7 @@ macro('when-not', 2) -- do B when A is falsy
 macro('if',       2) -- do B when A is truthy and C when A is falsy
 macro('cond',     0) -- does the first truthy tuple
 macro('match',    0) -- does pattern matching
+macro('module',   0) -- defines a module
 
 -- blocked keywords
 macro('return', 0) -- returning is not allowed
